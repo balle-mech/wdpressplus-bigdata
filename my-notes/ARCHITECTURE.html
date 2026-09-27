@@ -1,0 +1,542 @@
+<title>USCRN データ基盤マップ</title>
+<meta name="description" content="「ビッグデータを支える技術」の docker-compose 環境で、MinIO・Hive Metastore・PostgreSQL・Spark・Presto がどうつながっているかを図で説明するページ。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#F3F6F9; --surface:#FFFFFF; --ink:#16202C; --muted:#5A6878; --line:#CBD3DD; --arrow:#6B7A8C;
+  --st:#0F766E; --st-f:#DDF1EE;
+  --md:#B45309; --md-f:#FCEEDA;
+  --cp:#4338CA; --cp-f:#E6E7FB;
+  --sv:#BE185D; --sv-f:#FAE3ED;
+  --code-bg:#EAEEF3;
+  --sans:"IBM Plex Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0F151C; --surface:#16202A; --ink:#E4EAF1; --muted:#95A3B4; --line:#2E3B4A; --arrow:#8492A3;
+    --st:#5EC4B6; --st-f:#113330;
+    --md:#F0B35A; --md-f:#3A2A12;
+    --cp:#A6ABF6; --cp-f:#222452;
+    --sv:#F28AB7; --sv-f:#3E1A2B;
+    --code-bg:#1D2935;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F151C; --surface:#16202A; --ink:#E4EAF1; --muted:#95A3B4; --line:#2E3B4A; --arrow:#8492A3;
+  --st:#5EC4B6; --st-f:#113330;
+  --md:#F0B35A; --md-f:#3A2A12;
+  --cp:#A6ABF6; --cp-f:#222452;
+  --sv:#F28AB7; --sv-f:#3E1A2B;
+  --code-bg:#1D2935;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.75;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:40px 72px;display:grid;gap:56px}
+h1,h2,h3{text-wrap:balance;line-height:1.35;margin:0}
+h1{font-size:30px;font-weight:700;letter-spacing:.01em}
+h2{font-size:21px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0;max-width:68ch}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+section{display:grid;gap:18px}
+.lead{font-size:16px;color:var(--muted)}
+header{display:grid;gap:12px}
+
+/* ---- diagram ---- */
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:820px;height:auto}
+svg text{font-family:var(--sans);fill:var(--ink)}
+svg .t-name{font-size:15px;font-weight:700}
+svg .t-sub{font-size:11.5px;fill:var(--muted);font-family:var(--mono)}
+svg .t-edge{font-size:11.5px;fill:var(--muted)}
+svg .t-group{font-size:12px;font-family:var(--mono);font-weight:500}
+svg .edge{stroke:var(--arrow);stroke-width:1.6;fill:none}
+svg .edge.meta{stroke-dasharray:5 4}
+svg marker path{fill:var(--arrow)}
+.node{cursor:pointer}
+.node rect{stroke-width:1.6}
+.node:focus{outline:none}
+.node:focus-visible rect.box{stroke-width:3}
+.st rect.box{fill:var(--st-f);stroke:var(--st)}
+.md rect.box{fill:var(--md-f);stroke:var(--md)}
+.cp rect.box{fill:var(--cp-f);stroke:var(--cp)}
+.sv rect.box{fill:var(--sv-f);stroke:var(--sv)}
+.ext rect.box{fill:var(--surface);stroke:var(--arrow);stroke-dasharray:4 4}
+.minio-frame{fill:none;stroke:var(--st);stroke-width:1.6}
+.t-group.st{fill:var(--st)}
+.pg-badge rect{fill:var(--surface);stroke:var(--line)}
+.pg-badge text{font-size:10px;font-family:var(--mono);fill:var(--muted)}
+.dim .node:not(.on){opacity:.3}
+.dim .edge-g:not(.on){opacity:.15}
+.dim .minio-frame,.dim .t-group{opacity:.5}
+.node.on rect.box{stroke-width:3}
+.node,.edge-g{transition:opacity .15s}
+@media (prefers-reduced-motion:reduce){.node,.edge-g{transition:none}}
+
+.detail{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.detail .chip{grid-row:span 3;align-self:start;font-family:var(--mono);font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.detail h3{margin:0}
+.detail .d-body{color:var(--ink)}
+.detail .d-conf{color:var(--muted);font-size:13px}
+.hint{font-size:13px;color:var(--muted)}
+.chip.st{color:var(--st)} .chip.md{color:var(--md)} .chip.cp{color:var(--cp)} .chip.sv{color:var(--sv)} .chip.ext{color:var(--muted)}
+
+/* ---- layers strip ---- */
+.layers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.layer{border-top:3px solid var(--c);background:var(--surface);padding:14px 16px;display:grid;gap:6px;align-content:start}
+.layer .k{font-size:12px;color:var(--c);font-family:var(--mono);letter-spacing:.05em}
+.layer h3{font-size:15px}
+.layer p{font-size:14px;color:var(--muted)}
+
+/* ---- analogy ---- */
+.analogy{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.an{padding:16px;display:grid;gap:6px;align-content:start;border-right:1px solid var(--line)}
+.an:last-child{border-right:0}
+.an .role{font-size:12px;font-family:var(--mono);color:var(--c)}
+.an .real{font-weight:700}
+.an .meta{font-size:14px;color:var(--muted)}
+
+/* ---- two-panel "what is stored" ---- */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:10px;align-content:start;min-width:0}
+.panel .k{font-family:var(--mono);font-size:12px;color:var(--c)}
+pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--code-bg);padding:12px 14px;border-radius:6px;overflow-x:auto}
+pre .c{color:var(--muted)}
+.callout{border-left:3px solid var(--md);padding:4px 0 4px 14px;max-width:72ch}
+
+/* ---- steps ---- */
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:0;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:36px 1fr;gap:4px 14px;padding:14px 0;border-top:1px solid var(--line)}
+ol.steps li:last-child{border-bottom:1px solid var(--line)}
+ol.steps li::before{content:counter(s);grid-row:span 2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:500;background:var(--ink);color:var(--bg)}
+ol.steps .who{font-weight:700}
+ol.steps .what{color:var(--muted);font-size:14px}
+
+/* ---- tables ---- */
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.04em;background:var(--code-bg)}
+td code{white-space:nowrap}
+td.file{color:var(--muted);font-family:var(--mono);font-size:12px}
+
+footer{font-size:13px;color:var(--muted)}
+
+@media (max-width:760px){
+  .layers,.split{grid-template-columns:1fr}
+  .analogy{grid-template-columns:1fr 1fr}
+  .an:nth-child(2){border-right:0}
+  .an:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  h1{font-size:25px}
+}
+@media (max-width:440px){
+  .analogy{grid-template-columns:1fr}
+  .an{border-right:0;border-bottom:1px solid var(--line)}
+  .an:last-child{border-bottom:0}
+}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">ビッグデータを支える技術 · wdpressplus-bigdata</div>
+  <h1>USCRN データ基盤マップ</h1>
+  <p class="lead">このリポジトリの <code>docker-compose.yml</code> が立ち上げるコンテナは、米国の気象観測データ（NOAA の USCRN）を集めて、加工して、集計して、グラフにするまでの流れを分担しています。どのコンテナが何を持ち、誰と話しているのかを、設定ファイルの中身から図にしました。</p>
+</header>
+
+<!-- ============ 1. 全体図 ============ -->
+<section>
+  <h2>全体図</h2>
+  <p>左上から右下へデータが流れます。四角をクリックすると、そのコンテナの役割と接続先が下に出ます。</p>
+
+  <div class="diagram" id="diagram">
+  <svg viewBox="0 0 1040 640" role="img" aria-label="コンテナ構成図">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z"/>
+      </marker>
+    </defs>
+
+    <!-- MinIO frame -->
+    <rect class="minio-frame" x="346" y="28" width="440" height="172" rx="10"/>
+    <text class="t-group st" x="362" y="54">minio · オブジェクトストレージ（S3互換） :9000</text>
+
+    <!-- ===== edges ===== -->
+    <g class="edge-g" data-a="noaa" data-b="download">
+      <path class="edge" d="M136,116 L174,116" marker-end="url(#ah)"/>
+      <text class="t-edge" x="155" y="106" text-anchor="middle">HTTP</text>
+    </g>
+    <g class="edge-g" data-a="download" data-b="datalake">
+      <path class="edge" d="M306,128 L364,128" marker-end="url(#ah)"/>
+      <text class="t-edge" x="326" y="118" text-anchor="middle">S3 API</text>
+    </g>
+    <g class="edge-g" data-a="datalake" data-b="spark">
+      <path class="edge" d="M430,182 L430,288" marker-end="url(#ah)"/>
+      <text class="t-edge" x="422" y="240" text-anchor="end">生データを読む</text>
+    </g>
+    <g class="edge-g" data-a="spark" data-b="warehouse">
+      <path class="edge" d="M556,318 L612,318 L612,184" marker-end="url(#ah)"/>
+      <text class="t-edge" x="620" y="244">Parquetで保存</text>
+    </g>
+    <g class="edge-g" data-a="warehouse" data-b="presto">
+      <path class="edge" d="M740,182 L740,288" marker-end="url(#ah)"/>
+      <text class="t-edge" x="748" y="244">ファイルを読む</text>
+    </g>
+    <g class="edge-g" data-a="spark" data-b="metastore">
+      <path class="edge meta" d="M461,362 L461,476 L498,476" marker-end="url(#ah)"/>
+      <text class="t-edge" x="453" y="424" text-anchor="end">テーブルを登録</text>
+    </g>
+    <g class="edge-g" data-a="presto" data-b="metastore">
+      <path class="edge meta" d="M740,362 L740,476 L702,476" marker-end="url(#ah)"/>
+      <text class="t-edge" x="748" y="424">場所と列を聞く</text>
+    </g>
+    <g class="edge-g" data-a="metastore" data-b="metastoredb">
+      <path class="edge meta" d="M600,512 L600,558" marker-end="url(#ah)"/>
+      <text class="t-edge" x="608" y="540">JDBC</text>
+    </g>
+    <g class="edge-g" data-a="presto" data-b="dmpy">
+      <path class="edge" d="M830,326 L878,326" marker-end="url(#ah)"/>
+      <text class="t-edge" x="854" y="316" text-anchor="middle">SQL</text>
+    </g>
+    <g class="edge-g" data-a="dmpy" data-b="datamart">
+      <path class="edge" d="M952,362 L952,438" marker-end="url(#ah)"/>
+      <text class="t-edge" x="944" y="404" text-anchor="end">集計を書く</text>
+    </g>
+    <g class="edge-g" data-a="datamart" data-b="metabase">
+      <path class="edge" d="M952,512 L952,558" marker-end="url(#ah)"/>
+      <text class="t-edge" x="944" y="540" text-anchor="end">読む</text>
+    </g>
+
+    <!-- ===== nodes ===== -->
+    <g class="node ext" data-id="noaa" tabindex="0" role="button" aria-label="NOAA">
+      <rect class="box" x="16" y="84" width="120" height="64" rx="8"/>
+      <text class="t-name" x="76" y="112" text-anchor="middle">NOAA</text>
+      <text class="t-sub" x="76" y="132" text-anchor="middle">外部サイト</text>
+    </g>
+    <g class="node cp" data-id="download" tabindex="0" role="button" aria-label="download">
+      <rect class="box" x="176" y="84" width="130" height="64" rx="8"/>
+      <text class="t-name" x="241" y="112" text-anchor="middle">download</text>
+      <text class="t-sub" x="241" y="132" text-anchor="middle">Python / Prefect</text>
+    </g>
+    <g class="node st" data-id="datalake" tabindex="0" role="button" aria-label="datalake バケット">
+      <rect class="box" x="366" y="72" width="190" height="110" rx="6"/>
+      <text class="t-name" x="382" y="100">datalake/</text>
+      <text class="t-sub" x="382" y="124">uscrn/日付/*.txt.gz</text>
+      <text class="t-sub" x="382" y="144">生データそのまま</text>
+      <text class="t-sub" x="382" y="164">＝データレイク</text>
+    </g>
+    <g class="node st" data-id="warehouse" tabindex="0" role="button" aria-label="warehouse バケット">
+      <rect class="box" x="576" y="72" width="190" height="110" rx="6"/>
+      <text class="t-name" x="592" y="100">warehouse/</text>
+      <text class="t-sub" x="592" y="124">uscrn/year=2020/</text>
+      <text class="t-sub" x="592" y="144">part-*.parquet</text>
+      <text class="t-sub" x="592" y="164">＝テーブルの中身</text>
+    </g>
+    <g class="node cp" data-id="spark" tabindex="0" role="button" aria-label="Spark">
+      <rect class="box" x="366" y="290" width="190" height="72" rx="8"/>
+      <text class="t-name" x="461" y="320" text-anchor="middle">Spark</text>
+      <text class="t-sub" x="461" y="342" text-anchor="middle">scripts/warehouse.py</text>
+    </g>
+    <g class="node cp" data-id="presto" tabindex="0" role="button" aria-label="Presto">
+      <rect class="box" x="650" y="290" width="180" height="72" rx="8"/>
+      <text class="t-name" x="740" y="320" text-anchor="middle">Presto</text>
+      <text class="t-sub" x="740" y="342" text-anchor="middle">presto-server :8080</text>
+    </g>
+    <g class="node md" data-id="metastore" tabindex="0" role="button" aria-label="Hive Metastore">
+      <rect class="box" x="500" y="440" width="200" height="72" rx="8"/>
+      <text class="t-name" x="600" y="470" text-anchor="middle">Hive Metastore</text>
+      <text class="t-sub" x="600" y="492" text-anchor="middle">metastore :9083</text>
+    </g>
+    <g class="node md" data-id="metastoredb" tabindex="0" role="button" aria-label="metastore-db">
+      <rect class="box" x="500" y="560" width="200" height="64" rx="8"/>
+      <text class="t-name" x="600" y="588" text-anchor="middle">metastore-db</text>
+      <text class="t-sub" x="600" y="608" text-anchor="middle">テーブル定義の保存先</text>
+      <g class="pg-badge"><rect x="632" y="548" width="76" height="18" rx="9"/><text x="670" y="561" text-anchor="middle">PostgreSQL</text></g>
+    </g>
+    <g class="node cp" data-id="dmpy" tabindex="0" role="button" aria-label="datamart.py">
+      <rect class="box" x="880" y="290" width="144" height="72" rx="8"/>
+      <text class="t-name" x="952" y="320" text-anchor="middle">datamart</text>
+      <text class="t-sub" x="952" y="342" text-anchor="middle">Python (.py)</text>
+    </g>
+    <g class="node sv" data-id="datamart" tabindex="0" role="button" aria-label="datamart データベース">
+      <rect class="box" x="880" y="440" width="144" height="72" rx="8"/>
+      <text class="t-name" x="952" y="470" text-anchor="middle">datamart</text>
+      <text class="t-sub" x="952" y="492" text-anchor="middle">uscrn_summary</text>
+      <g class="pg-badge"><rect x="956" y="428" width="76" height="18" rx="9"/><text x="994" y="441" text-anchor="middle">PostgreSQL</text></g>
+    </g>
+    <g class="node sv" data-id="metabase" tabindex="0" role="button" aria-label="Metabase">
+      <rect class="box" x="880" y="560" width="144" height="64" rx="8"/>
+      <text class="t-name" x="952" y="588" text-anchor="middle">Metabase</text>
+      <text class="t-sub" x="952" y="608" text-anchor="middle">:13000</text>
+    </g>
+
+    <!-- legend -->
+    <g transform="translate(16,440)">
+      <text class="t-group" x="0" y="0" style="fill:var(--muted)">色の意味</text>
+      <rect x="0" y="16" width="14" height="14" rx="3" style="fill:var(--st-f);stroke:var(--st)"/>
+      <text class="t-edge" x="22" y="28" style="fill:var(--ink)">データ本体の置き場</text>
+      <rect x="0" y="42" width="14" height="14" rx="3" style="fill:var(--md-f);stroke:var(--md)"/>
+      <text class="t-edge" x="22" y="54" style="fill:var(--ink)">メタデータ（目録）</text>
+      <rect x="0" y="68" width="14" height="14" rx="3" style="fill:var(--cp-f);stroke:var(--cp)"/>
+      <text class="t-edge" x="22" y="80" style="fill:var(--ink)">処理する人（計算）</text>
+      <rect x="0" y="94" width="14" height="14" rx="3" style="fill:var(--sv-f);stroke:var(--sv)"/>
+      <text class="t-edge" x="22" y="106" style="fill:var(--ink)">分析者向けの出口</text>
+      <path d="M0,132 L30,132" class="edge meta"/>
+      <text class="t-edge" x="38" y="136" style="fill:var(--ink)">メタデータのやり取り</text>
+      <path d="M0,156 L30,156" class="edge"/>
+      <text class="t-edge" x="38" y="160" style="fill:var(--ink)">データそのものの流れ</text>
+    </g>
+  </svg>
+  </div>
+
+  <div class="detail" id="detail" aria-live="polite">
+    <span class="chip md" id="d-chip">メタデータ</span>
+    <h3 id="d-title">Hive Metastore</h3>
+    <p class="d-body" id="d-body"></p>
+    <p class="d-conf" id="d-conf"></p>
+  </div>
+  <p class="hint">もう一度同じ四角をクリックすると、強調表示を解除します。</p>
+</section>
+
+<!-- ============ 2. 本で出てくる3つの層 ============ -->
+<section>
+  <h2>本に出てくる 3 つの層との対応</h2>
+  <div class="layers">
+    <div class="layer" style="--c:var(--st)">
+      <div class="k">DATA LAKE</div>
+      <h3>MinIO の <code>datalake</code> バケット</h3>
+      <p>ダウンロードしたテキストファイルを加工せずに置く場所です。形式はバラバラでよく、とにかく貯めておきます。</p>
+    </div>
+    <div class="layer" style="--c:var(--md)">
+      <div class="k">DATA WAREHOUSE</div>
+      <h3><code>warehouse</code> バケット ＋ Metastore</h3>
+      <p>Spark が列の決まった Parquet に変換したもの。ファイル（MinIO）と、その定義（Metastore）の 2 つがそろって初めて SQL で引ける「テーブル」になります。</p>
+    </div>
+    <div class="layer" style="--c:var(--sv)">
+      <div class="k">DATA MART</div>
+      <h3>PostgreSQL の <code>datamart</code></h3>
+      <p>Presto で日ごとの平均気温に集計した小さな表 <code>uscrn_summary</code>。Metabase はここだけを見るので速く表示できます。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. MinIO と Metastore の関係 ============ -->
+<section>
+  <h2>MinIO・Metastore・metastore-db の関係</h2>
+  <p>いちばんつまずきやすいところです。図書館にたとえると、役割の分担がわかりやすくなります。</p>
+
+  <div class="analogy">
+    <div class="an" style="--c:var(--st)">
+      <div class="role">書庫の本棚</div>
+      <div class="real">MinIO</div>
+      <div class="meta">本（データファイル）そのものが並んでいる。ただし棚は「どれが何の本か」を説明してくれない。</div>
+    </div>
+    <div class="an" style="--c:var(--md)">
+      <div class="role">司書</div>
+      <div class="real">Hive Metastore</div>
+      <div class="meta">「uscrn という本はどの棚にある？どんな章立て？」に答える窓口。自分では本を運ばない。</div>
+    </div>
+    <div class="an" style="--c:var(--md)">
+      <div class="role">目録カードの引き出し</div>
+      <div class="real">metastore-db</div>
+      <div class="meta">司書が参照する台帳。司書（Metastore）はここに書き込んだり読んだりするだけで、中身はただの PostgreSQL の表。</div>
+    </div>
+    <div class="an" style="--c:var(--cp)">
+      <div class="role">利用者</div>
+      <div class="real">Spark / Presto</div>
+      <div class="meta">司書に場所を聞いてから、自分で書庫に行って本を読む（または新しい本を置いて目録に登録してもらう）。</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel" style="--c:var(--st)">
+      <div class="k">MinIO の warehouse バケットにあるもの</div>
+      <pre>warehouse/
+└── uscrn/
+    └── year=2020/
+        ├── part-00000-….snappy.parquet
+        └── part-00001-….snappy.parquet</pre>
+      <p style="font-size:14px">ただのファイルの集まりです。「これは <code>uscrn</code> というテーブルで、<code>year</code> で分割されている」という情報はどこにも登録されていません。</p>
+    </div>
+    <div class="panel" style="--c:var(--md)">
+      <div class="k">metastore-db（PostgreSQL）にあるもの</div>
+      <pre><span class="c">-- Hive が作る管理用テーブル（抜粋）</span>
+DBS         default → s3a://warehouse/
+TBLS        uscrn
+SDS         LOCATION = s3a://warehouse/uscrn
+COLUMNS_V2  timestamp  timestamp
+            wbanno     string
+            temperature double
+PARTITIONS  year=2020</pre>
+      <p style="font-size:14px">テーブル名・列・型・ファイルの場所・パーティション一覧という「データについてのデータ」です。気温の値そのものは 1 件も入っていません。</p>
+    </div>
+  </div>
+
+  <p class="callout"><strong>ポイント:</strong> Metastore は「データを通す」コンテナではありません。Presto も Spark も、Metastore からは場所と列の情報だけを受け取り、データ本体は MinIO と直接やり取りします。だから Metastore の設定ファイルにも MinIO の接続先（<code>fs.s3a.endpoint</code>）が書かれていますが、主な用途はテーブルの保存場所（<code>s3a://warehouse/</code>）を扱うことです。</p>
+</section>
+
+<!-- ============ 4. クエリが流れる順番 ============ -->
+<section>
+  <h2>SELECT が実行されるとき</h2>
+  <p><code>scripts/datamart.py</code> が Presto に集計クエリを投げたとき、コンテナの間で起きることを順番に追います。</p>
+  <pre>SELECT date_trunc('day', timestamp) time, wbanno, avg(temperature) avg_temperature
+FROM uscrn GROUP BY 1, 2</pre>
+  <ol class="steps">
+    <li><span class="who">datamart.py → presto-server:8080</span><span class="what">Python（pyhive）が SQL を Presto に送ります。</span></li>
+    <li><span class="who">Presto → metastore:9083（Thrift）</span><span class="what">「<code>uscrn</code> ってどこにあって、どんな列があるの？」と問い合わせます。Presto 自身はテーブルの定義を持っていません。</span></li>
+    <li><span class="who">Metastore → metastore-db:5432（JDBC）</span><span class="what">Metastore が PostgreSQL の <code>TBLS</code> や <code>SDS</code> を検索し、「<code>s3a://warehouse/uscrn</code> にある Parquet で、列はこの 3 つ、パーティションは <code>year=2020</code>」と Presto に返します。</span></li>
+    <li><span class="who">Presto → minio:9000（S3 API）</span><span class="what">教わった場所の Parquet ファイルを MinIO から直接読み込み、日ごとに平均を計算します。</span></li>
+    <li><span class="who">datamart.py → datamart:5432</span><span class="what">結果を受け取った Python が PostgreSQL の <code>datamart</code> に <code>uscrn_summary</code> テーブルとして書き込み、Metabase がそれをグラフにします。</span></li>
+  </ol>
+  <p>テーブルを作る側（Spark の <code>saveAsTable('uscrn')</code>）も同じ構図で、Parquet ファイルは MinIO に書き、テーブル定義は Metastore 経由で metastore-db に登録します。</p>
+</section>
+
+<!-- ============ 5. PostgreSQL が 2 つある理由 ============ -->
+<section>
+  <h2>PostgreSQL が 2 つある理由</h2>
+  <p>どちらも <code>postgres:11</code> イメージですが、役割はまったく別です。同じ製品を別々の目的に使っているだけです。</p>
+  <div class="tbl">
+  <table>
+    <thead><tr><th></th><th>metastore-db</th><th>datamart</th></tr></thead>
+    <tbody>
+      <tr><td>中身</td><td>テーブル定義（メタデータ）</td><td>集計済みのデータ（<code>uscrn_summary</code>）</td></tr>
+      <tr><td>書き込むのは</td><td>Hive Metastore だけ</td><td><code>datamart.py</code></td></tr>
+      <tr><td>読むのは</td><td>Hive Metastore だけ</td><td>Metabase（人間の分析者）</td></tr>
+      <tr><td>人が直接 SQL を打つか</td><td>普通は打たない</td><td>打つ・グラフにする</td></tr>
+      <tr><td>初期化</td><td><code>docker-compose run --rm metastore /initSchema</code> で約 1200 行の DDL を流して管理用テーブルを作る</td><td>不要（<code>to_sql</code> が自動でテーブルを作る）</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 6. 接続先の出どころ ============ -->
+<section>
+  <h2>接続先はどこに書いてあるか</h2>
+  <p>コンテナ同士は <code>docker-compose.yml</code> のサービス名（<code>minio</code>、<code>metastore</code> など）をホスト名として呼び合います。Docker が同じネットワーク内で名前解決してくれるためです。Mac から <code>localhost</code> で届くのは、<code>ports:</code> で公開している <code>minio:9000</code> と <code>metabase:13000</code> だけです。</p>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>接続元 → 接続先</th><th>アドレス</th><th>書かれているファイル</th></tr></thead>
+    <tbody>
+      <tr><td>download → MinIO</td><td><code>http://localhost:9000</code></td><td class="file">flows/download.py</td></tr>
+      <tr><td>Spark → MinIO</td><td><code>http://minio:9000</code></td><td class="file">containers/spark/spark-defaults.conf</td></tr>
+      <tr><td>Spark → Metastore</td><td><code>thrift://metastore:9083</code></td><td class="file">scripts/warehouse.py</td></tr>
+      <tr><td>Metastore → metastore-db</td><td><code>jdbc:postgresql://metastore-db:5432/metastore</code></td><td class="file">containers/hive-metastore/conf/metastore-site.xml</td></tr>
+      <tr><td>Metastore → MinIO</td><td><code>http://minio:9000</code>（<code>s3a://warehouse/</code>）</td><td class="file">containers/hive-metastore/conf/metastore-site.xml</td></tr>
+      <tr><td>Presto → Metastore</td><td><code>thrift://metastore:9083</code></td><td class="file">containers/presto/etc/catalog/hive.properties</td></tr>
+      <tr><td>Presto → MinIO</td><td><code>http://minio:9000</code></td><td class="file">containers/presto/etc/catalog/hive.properties</td></tr>
+      <tr><td>datamart.py → Presto</td><td><code>presto-server:8080</code></td><td class="file">scripts/datamart.py</td></tr>
+      <tr><td>datamart.py → datamart</td><td><code>postgresql://datamart:5432/datamart</code></td><td class="file">scripts/datamart.py</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 7. 起動順 ============ -->
+<section>
+  <h2>起動する順番とその理由</h2>
+  <p>README の手順は、依存される側から先に立ち上げる順になっています。</p>
+  <ol class="steps">
+    <li><span class="who"><code>docker-compose up -d minio</code></span><span class="what">データの置き場。ほかの全員が参照するので最初に起動します。バケット（<code>datalake</code>・<code>warehouse</code>）もここで作っておきます。</span></li>
+    <li><span class="who"><code>docker-compose up -d metastore-db</code></span><span class="what">Metastore が使う台帳用の PostgreSQL。この時点ではまだ空です。</span></li>
+    <li><span class="who"><code>docker-compose run --rm metastore /initSchema</code></span><span class="what">Hive の <code>schematool</code> で、metastore-db に <code>TBLS</code> や <code>SDS</code> などの管理用テーブルを作ります。最初の 1 回だけ必要です。</span></li>
+    <li><span class="who"><code>docker-compose up -d metastore</code></span><span class="what">台帳が準備できたので、司書役を起動します（<code>depends_on</code> で metastore-db と minio を指定済み）。</span></li>
+    <li><span class="who"><code>docker-compose up -d presto-server</code></span><span class="what">起動時に Metastore へつなぐため、Metastore の後に起動します。</span></li>
+    <li><span class="who"><code>docker-compose up -d datamart</code> → <code>metabase</code></span><span class="what">出口側。集計結果の置き場と、それを見るツールです。</span></li>
+  </ol>
+  <p>Spark（<code>spark-submit</code>）と Python は常駐しません。<code>docker-compose run --rm spark-submit …</code> のように、処理を 1 回実行して終わるコンテナです。</p>
+</section>
+
+<footer>このページは <code>docker-compose.yml</code>、<code>containers/</code> 以下の設定ファイル、<code>scripts/</code>・<code>flows/</code> のコードをもとに作成しました。</footer>
+
+</div>
+
+<script>
+(function(){
+  var info = {
+    noaa:{cls:'ext',chip:'外部',title:'NOAA（米国海洋大気庁）',
+      body:'USCRN（米国の気候観測網）の 5 分ごとの観測データを配布しているサイトです。コンテナではありません。',
+      conf:'取得元: https://www1.ncdc.noaa.gov/pub/data/uscrn/products/subhourly01'},
+    download:{cls:'cp',chip:'処理',title:'download（flows/download.py）',
+      body:'NOAA から観測所ごとのテキストファイルをダウンロードし、boto3 で MinIO の datalake バケットへそのままアップロードします。Prefect のフローとして毎日動かす想定です。',
+      conf:'接続先: http://localhost:9000（ホストの Mac から実行するため localhost）'},
+    datalake:{cls:'st',chip:'データ本体',title:'datalake バケット（MinIO）',
+      body:'データレイク。ダウンロードした生データを加工せずに置く場所です。Spark がここを読んで整形します。',
+      conf:'パス例: s3a://datalake/uscrn/2020-08-29/CRNS0101-05-2020-AK_Bethel_87_WNW.txt.gz'},
+    warehouse:{cls:'st',chip:'データ本体',title:'warehouse バケット（MinIO）',
+      body:'Hive テーブルの中身（Parquet ファイル）が置かれる場所です。Metastore の設定 metastore.warehouse.dir が s3a://warehouse/ を指しているので、Spark が saveAsTable すると自動でここに保存されます。',
+      conf:'パス例: s3a://warehouse/uscrn/year=2020/part-00000-….snappy.parquet'},
+    spark:{cls:'cp',chip:'処理',title:'Spark（scripts/warehouse.py）',
+      body:'datalake のテキストを 1 行ずつ解析して timestamp・wbanno・temperature の列を持つ表にし、uscrn テーブルとして保存します。ファイルは MinIO へ、テーブル定義は Metastore へ、と 2 か所に書き込みます。',
+      conf:'MinIO: http://minio:9000（spark-defaults.conf） / Metastore: thrift://metastore:9083'},
+    presto:{cls:'cp',chip:'処理',title:'Presto（presto-server）',
+      body:'SQL を受け付ける分散クエリエンジンです。自分ではデータもテーブル定義も持たず、Metastore に定義を聞き、MinIO から Parquet を読んで計算します。',
+      conf:'catalog/hive.properties: hive.metastore.uri=thrift://metastore:9083, hive.s3.endpoint=http://minio:9000'},
+    metastore:{cls:'md',chip:'メタデータ',title:'Hive Metastore',
+      body:'「どのテーブルが、どの場所に、どんな列で保存されているか」を管理する窓口です。Spark がテーブルを作ると登録を受け付け、Presto が問い合わせると答えます。データ本体は通しません。自分の記録は metastore-db（PostgreSQL）に保存します。',
+      conf:'待ち受け: thrift://0.0.0.0:9083 / 保存先: jdbc:postgresql://metastore-db:5432/metastore（metastore-site.xml）'},
+    metastoredb:{cls:'md',chip:'メタデータ',title:'metastore-db（PostgreSQL）',
+      body:'Metastore 専用の台帳です。TBLS（テーブル一覧）、SDS（保存場所）、COLUMNS_V2（列）、PARTITIONS（パーティション）などの表を持ちます。initSchema で最初に作成します。Metastore 以外は接続しません。',
+      conf:'DB名・ユーザー・パスワード: すべて metastore（docker-compose.yml）'},
+    dmpy:{cls:'cp',chip:'処理',title:'datamart（scripts/datamart.py）',
+      body:'Presto に集計 SQL を投げ、その結果を pandas の DataFrame で受け取って、PostgreSQL の datamart に書き込みます。クエリは queries/uscrn_summary.yml にも定義されています。',
+      conf:'Presto: presto-server:8080 / 書き込み先: postgresql://datamart:5432/datamart'},
+    datamart:{cls:'sv',chip:'出口',title:'datamart（PostgreSQL）',
+      body:'データマート。日ごと・観測所ごとの平均気温 uscrn_summary だけが入った小さなデータベースです。metastore-db とは別物で、人が見るためのデータを置きます。',
+      conf:'DB名・ユーザー・パスワード: すべて datamart（docker-compose.yml）'},
+    metabase:{cls:'sv',chip:'出口',title:'Metabase',
+      body:'ブラウザで使う BI ツールです。datamart に接続して、平均気温の推移をグラフにします。',
+      conf:'Mac から http://localhost:13000 で開く'}
+  };
+
+  var svg = document.querySelector('#diagram svg');
+  var nodes = svg.querySelectorAll('.node');
+  var edges = svg.querySelectorAll('.edge-g');
+  var chip = document.getElementById('d-chip');
+  var title = document.getElementById('d-title');
+  var body = document.getElementById('d-body');
+  var conf = document.getElementById('d-conf');
+  var current = null;
+
+  function show(id){
+    var d = info[id];
+    chip.className = 'chip ' + d.cls;
+    chip.textContent = d.chip;
+    title.textContent = d.title;
+    body.textContent = d.body;
+    conf.textContent = d.conf;
+  }
+  function highlight(id){
+    current = id;
+    svg.classList.toggle('dim', !!id);
+    var linked = {};
+    if(id) linked[id] = true;
+    edges.forEach(function(e){
+      var on = id && (e.dataset.a === id || e.dataset.b === id);
+      e.classList.toggle('on', !!on);
+      if(on){ linked[e.dataset.a] = true; linked[e.dataset.b] = true; }
+    });
+    nodes.forEach(function(n){ n.classList.toggle('on', !!linked[n.dataset.id]); });
+  }
+  function select(id){
+    if(current === id){ highlight(null); return; }
+    show(id); highlight(id);
+  }
+  nodes.forEach(function(n){
+    n.addEventListener('click', function(){ select(n.dataset.id); });
+    n.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); select(n.dataset.id); }
+    });
+  });
+
+  show('metastore'); highlight('metastore');
+})();
+</script>
