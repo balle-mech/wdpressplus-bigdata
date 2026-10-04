@@ -5,7 +5,6 @@
 ## 再開（データはそのまま残っている前提）
 
 ```fish
-cd wdpressplus-bigdata
 docker-compose start
 ```
 
